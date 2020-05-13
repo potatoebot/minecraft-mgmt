@@ -33,3 +33,5 @@ To render the map:
 - On WS
   - unzip outworld to /data/www/
   - rm zipfile
+
+ami-0b921c6748be54b1b
