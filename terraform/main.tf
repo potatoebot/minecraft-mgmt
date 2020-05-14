@@ -23,6 +23,11 @@ variable "phase" {
   type  = string
 }
 
+variable "render_image_id" {
+  type    = string
+  default = "none"
+}
+
 locals {
   enable_render           = var.phase == "render" ? true : false
   enable_provisionalMCS   = var.phase == "setup" || var.phase == "staging" ? true : false 
@@ -33,9 +38,44 @@ provider "aws" {
   region = "us-east-2"
 }
 
+resource "aws_vpc" "potatoebot" {
+  cidr_block = "10.0.0.0/16"
+}
+
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.potatoebot.id
+}
+
+resource "aws_route_table" "r" {
+  vpc_id = aws_vpc.potatoebot.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.gw.id
+  }
+
+  tags = {
+    Name = "main"
+  }
+}
+
+
+
+resource "aws_subnet" "minecraft" {
+  vpc_id                  = "${aws_vpc.potatoebot.id}"
+  cidr_block              = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "minecraft"
+  }
+}
+
+
 resource "aws_security_group" "ssh" {
   name        = "ssh"
   description = "Allow ssh from home"
+  vpc_id      = aws_vpc.potatoebot.id
 
   ingress {
     description = "ssh port"
@@ -60,6 +100,7 @@ resource "aws_security_group" "ssh" {
 resource "aws_security_group" "minecraft" {
   name        = "minecraft"
   description = "Expose minecraft port"
+  vpc_id      = aws_vpc.potatoebot.id
 
   ingress {
     description = "minecraft port"
@@ -83,27 +124,30 @@ resource "aws_security_group" "minecraft" {
 resource "aws_instance" "MCS" {
   ami             = "ami-0f7919c33c90f5b58"
   instance_type   = "t3a.small"
-  security_groups = [aws_security_group.minecraft.name, aws_security_group.ssh.name]
   key_name        = "minecraft"
+  subnet_id       = aws_subnet.minecraft.id
+  vpc_security_group_ids = [aws_security_group.ssh.id, aws_security_group.minecraft.id]
 }
 
 resource "aws_instance" "provisionalMCS" {
   ami             = "ami-0f7919c33c90f5b58"
   instance_type   = "t3a.small"
-  security_groups = [aws_security_group.minecraft.name, aws_security_group.ssh.name]
   key_name        = "minecraft"
   count           = local.enable_provisionalMCS ? 1 : 0
+  subnet_id       = aws_subnet.minecraft.id
+  vpc_security_group_ids = [aws_security_group.ssh.id, aws_security_group.minecraft.id]
 }
 
 #resource "aws_instance" "webserver" {
 #}
 
 resource "aws_instance" "render" {
-  ami               = "ami-0b921c6748be54b1b"
+  ami               = var.render_image_id
   instance_type     = "t3.2xlarge"
-  security_groups   = [aws_security_group.ssh.name]
   key_name          = "minecraft"
   count             = local.enable_render ? 1 : 0
+  subnet_id       = aws_subnet.minecraft.id
+  vpc_security_group_ids = [aws_security_group.ssh.id, aws_security_group.minecraft.id]
 }
 
 resource "aws_route53_record" "mc_alias" {
@@ -118,6 +162,10 @@ output "MCS_public_ip" {
     value = "${aws_instance.MCS.public_ip}"
 }
 
-output "render_public_dns" {
+output "MCS_dns" {
+  value = "${aws_instance.MCS.public_dns}"  
+}
+
+output "render_dns" {
     value = [for r in aws_instance.render : "${r.public_dns}"]
 }
