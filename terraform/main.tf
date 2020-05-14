@@ -24,7 +24,7 @@ variable "phase" {
 }
 
 locals {
-  enable_renderer         = var.phase == "render" ? true : false
+  enable_render           = var.phase == "render" ? true : false
   enable_provisionalMCS   = var.phase == "setup" || var.phase == "staging" ? true : false 
   use_provisionalMCS      = var.phase == "staging" ? true : false
 }
@@ -98,12 +98,12 @@ resource "aws_instance" "provisionalMCS" {
 #resource "aws_instance" "webserver" {
 #}
 
-resource "aws_instance" "renderer" {
+resource "aws_instance" "render" {
   ami               = "ami-0b921c6748be54b1b"
   instance_type     = "t3.2xlarge"
   security_groups   = [aws_security_group.ssh.name]
   key_name          = "minecraft"
-  count             = local.enable_renderer ? 1 : 0
+  count             = local.enable_render ? 1 : 0
 }
 
 resource "aws_route53_record" "mc_alias" {
@@ -114,6 +114,10 @@ resource "aws_route53_record" "mc_alias" {
     records = ["${local.use_provisionalMCS ? aws_instance.provisionalMCS[0].public_ip : aws_instance.MCS.public_ip}"]
 }
 
-output "MCS_dns" {
-    value = "${aws_instance.MCS.public_dns}"
+output "MCS_public_ip" {
+    value = "${aws_instance.MCS.public_ip}"
+}
+
+output "render_public_dns" {
+    value = [for r in aws_instance.render : "${r.public_dns}"]
 }
