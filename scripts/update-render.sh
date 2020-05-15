@@ -4,6 +4,7 @@ set -euo pipefail
 
 cd scripts
 render_image_id=$(./get-render-image.sh)
+MCS_image_id=$(./get-MCS-image.sh)
 
 # spin up image
 cd ../terraform

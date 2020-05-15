@@ -1,0 +1,71 @@
+{
+    "variables": {
+      "aws_access_key": "",
+      "aws_secret_key": ""
+    },
+    "builders": [
+      {
+        "type": "amazon-ebs",
+        "access_key": "{{user `aws_access_key`}}",
+        "secret_key": "{{user `aws_secret_key`}}",
+        "region": "us-east-2",
+        "source_ami_filter": {
+          "filters": {
+            "name": "*amazon-linux-2*",
+            "architecture": "x86_64",
+            "root-device-type": "ebs"
+          },
+          "owners": ["562637147889"],
+          "most_recent": true
+        },
+        "instance_type": "t3a.small",
+        "ssh_username": "ec2-user",
+        "ami_name": "MCS {{ timestamp }}",
+        "launch_block_device_mappings": [
+            {
+              "device_name": "/dev/sda1",
+              "volume_size": 128,
+              "volume_type": "gp2",
+              "delete_on_termination": true
+            }
+        ]
+      }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "inline": ["sleep 30", "sudo yum update -y"]
+        },
+        {
+            "type": "shell",
+            "inline": ["sudo yum -y install java tmux"] 
+        },
+        {
+            "type": "shell",
+            "inline": ["mkdir /home/ec2-user/.aws"] 
+        },
+        {
+            "type": "file",
+            "source": "aws_config",
+            "destination": "/home/ec2-user/.aws/config"
+        },
+        {
+            "type": "file",
+            "source": "aws_cred",
+            "destination": "/home/ec2-user/.aws/credentials"
+        },
+        {
+            "type": "file",
+            "source": "../scripts/MCS/send-world-to-render.sh",
+            "destination": "/home/ec2-user/send-world-to-render.sh"
+        },
+        {
+            "type": "shell",
+            "inline": ["aws s3 cp s3://potatoebot/minecraft/latest.zip ."] 
+        },
+        {
+            "type": "shell",
+            "inline": ["unzip latest.zip"]
+        }
+    ]
+  }
